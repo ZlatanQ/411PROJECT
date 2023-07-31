@@ -1,0 +1,69 @@
+
+import socket
+import threading
+import xml.etree.ElementTree as ET
+
+
+class ITStudent:
+    def __init__(self, name, student_id, programme, courses):
+        self.name = name
+        self.student_id = student_id
+        self.programme = programme
+        self.courses = courses
+
+    def calculate_average_mark(self):
+        total_marks = sum(course['mark'] for course in self.courses)
+        return total_marks / len(self.courses)
+
+    def is_pass(self):
+        average_mark = self.calculate_average_mark()
+        return average_mark >= 50
+
+
+def read_xml(xml_data):
+    root = ET.fromstring(xml_data)
+    name_element = root.find('Name')
+    id_element = root.find('ID')
+    programme_element = root.find('Programme')
+    courses_element = root.find('Courses')
+    courses = []
+    for course_element in courses_element.findall('Course'):
+        code_element = course_element.find('Code')
+        mark_element = course_element.find('Mark')
+        courses.append({'code': int(code_element.text), 'mark': int(mark_element.text)})
+    return ITStudent(name_element.text, id_element.text, programme_element.text, courses)
+
+
+def handle_client(client_socket):
+    xml_data = client_socket.recv(1024).decode()
+    student = read_xml(xml_data)
+
+    average_mark = student.calculate_average_mark()
+    passed = student.is_pass()
+
+    print(f"Student Name: {student.name}")
+    print(f"Student ID: {student.student_id}")
+    print(f"Programme: {student.programme}")
+    print("Courses:")
+    for course in student.courses:
+        print(f"{course['code']}: {course['mark']}")
+    print(f"Average Mark: {average_mark}")
+    print(f"Passed: {'Yes' if passed else 'No'}")
+    print()
+
+    client_socket.close()
+
+
+server_address = ('localhost', 5000)
+max_connections = 10
+
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind(server_address)
+server_socket.listen(max_connections)
+
+print("Waiting for producers...")
+
+while True:
+    client_socket, client_address = server_socket.accept()
+    thread = threading.Thread(target=handle_client, args=(client_socket,))
+    thread.start()
